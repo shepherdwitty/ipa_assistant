@@ -1,0 +1,423 @@
+import { alignGraphemePhoneme } from '../domain/alignGrapheme'
+import { splitPhonemes } from '../domain/phonemeSplit'
+import { normalizeWord } from '../domain/wordClean'
+import { ipaService } from '../services/ipa/ipaService'
+import {
+  createId,
+  db,
+  type CandidateWord,
+  type GraphemePhonemeMap,
+  type ImportRecord,
+  type RuleCard,
+  type SourceType,
+  type WordPhoneme,
+  type WordRecord,
+} from './schema'
+
+export async function createImportDraft(params: {
+  sourceType: SourceType
+  ocrRawText: string
+  candidateWords: CandidateWord[]
+}): Promise<ImportRecord> {
+  const record: ImportRecord = {
+    id: createId('imp'),
+    sourceType: params.sourceType,
+    ocrRawText: params.ocrRawText,
+    candidateWords: params.candidateWords,
+    confirmedWords: [],
+    status: 'review',
+    createdAt: Date.now(),
+  }
+  await db.imports.add(record)
+  return record
+}
+
+export async function createManualImport(words: string[]): Promise<ImportRecord> {
+  const candidates: CandidateWord[] = words.map((w) => ({
+    word: w.toLowerCase(),
+    normalized: normalizeWord(w),
+    confidence: 1,
+    lowConfidence: false,
+  }))
+  return createImportDraft({
+    sourceType: 'manual',
+    ocrRawText: words.join(' '),
+    candidateWords: candidates,
+  })
+}
+
+export async function getImport(id: string): Promise<ImportRecord | undefined> {
+  return db.imports.get(id)
+}
+
+export async function updateImportCandidates(
+  id: string,
+  candidateWords: CandidateWord[],
+): Promise<void> {
+  await db.imports.update(id, { candidateWords })
+}
+
+export async function confirmImport(
+  importId: string,
+  confirmedWords: string[],
+): Promise<WordRecord[]> {
+  const unique = Array.from(
+    new Map(confirmedWords.map((w) => [normalizeWord(w), w.toLowerCase()])).entries(),
+  )
+
+  // IPA 网络查询放在事务外，避免事务超时
+  const prepared: Array<{
+    normalized: string
+    word: string
+    existing?: WordRecord
+    ipa?: Awaited<ReturnType<typeof ipaService.lookup>>
+  }> = []
+
+  for (const [normalized, word] of unique) {
+    const existing = await db.words.where('normalizedWord').equals(normalized).first()
+    if (existing) {
+      // 已有词若仍是待确认，尝试重新查音标并补全索引
+      if (existing.status === 'pending' || !existing.ipaFull) {
+        await refreshWordIpa(existing.id)
+        const updated = await db.words.get(existing.id)
+        prepared.push({ normalized, word, existing: updated ?? existing })
+      } else {
+        prepared.push({ normalized, word, existing })
+        const maps = await getGraphemeMaps(existing.id)
+        if (maps.length) await upsertRuleCardsFromMaps(maps, existing.id)
+      }
+      continue
+    }
+    const ipa = await ipaService.lookup(word)
+    prepared.push({ normalized, word, ipa })
+  }
+
+  const created: WordRecord[] = []
+
+  await db.transaction(
+    'rw',
+    db.imports,
+    db.words,
+    db.wordPhonemes,
+    db.graphemeMaps,
+    db.ruleCards,
+    async () => {
+      for (const item of prepared) {
+        if (item.existing) {
+          created.push(item.existing)
+          continue
+        }
+
+        const ipa = item.ipa!
+        const hasIpa = Boolean(ipa.ipa)
+        const wordRec: WordRecord = {
+          id: createId('w'),
+          word: item.word,
+          normalizedWord: item.normalized,
+          ipaFull: hasIpa ? ipa.ipa : null,
+          syllables: ipa.syllables,
+          sourceImportId: importId,
+          status: hasIpa ? 'normal' : 'pending',
+          createdAt: Date.now(),
+        }
+        await db.words.add(wordRec)
+        created.push(wordRec)
+
+        if (hasIpa && ipa.ipa) {
+          const phonemes = splitPhonemes(ipa.ipa)
+          const phonemeRows: WordPhoneme[] = phonemes.map((p, idx) => ({
+            id: createId('ph'),
+            wordId: wordRec.id,
+            phoneme: p,
+            positionInWord: idx,
+            positionInIpa: idx,
+          }))
+          await db.wordPhonemes.bulkAdd(phonemeRows)
+
+          const alignments = alignGraphemePhoneme(item.word, ipa.ipa)
+          const mapRows: GraphemePhonemeMap[] = alignments
+            .filter((a) => a.phoneme)
+            .map((a) => ({
+              id: createId('gp'),
+              wordId: wordRec.id,
+              grapheme: a.grapheme,
+              phoneme: a.phoneme,
+              startIndex: a.startIndex,
+              endIndex: a.endIndex,
+              confidence: a.confidence,
+            }))
+          if (mapRows.length) await db.graphemeMaps.bulkAdd(mapRows)
+
+          await upsertRuleCardsFromMaps(mapRows, wordRec.id)
+        }
+      }
+
+      await db.imports.update(importId, {
+        confirmedWords: unique.map(([, w]) => w),
+        status: 'confirmed',
+      })
+    },
+  )
+
+  // 事务外再全量回填一次，确保规律卡片与拆解一致
+  await rebuildRuleCardsFromLibrary()
+
+  return created
+}
+
+/** 多字母组合 + 一定置信度 → 可做成规律卡片（如 ph→/f/） */
+function isRuleCardWorthy(m: Pick<GraphemePhonemeMap, 'grapheme' | 'phoneme' | 'confidence'>): boolean {
+  if (!m.grapheme || !m.phoneme) return false
+  if (m.grapheme.length < 2) return false
+  // 略放宽：0.55 以上即可（与练习过滤接近），避免 ph 等规则对上了却不进卡片
+  if (m.confidence < 0.55) return false
+  if (/^[ʰʲʷˈˌ.\s]+$/.test(m.phoneme)) return false
+  return true
+}
+
+async function upsertRuleCardsFromMaps(
+  maps: GraphemePhonemeMap[],
+  wordId: string,
+): Promise<void> {
+  for (const m of maps) {
+    if (!isRuleCardWorthy(m)) continue
+    const id = `rule_${m.grapheme}_${m.phoneme}`
+    const existing = await db.ruleCards.get(id)
+    if (existing) {
+      const examples = Array.from(new Set([...existing.exampleWordIds, wordId]))
+      await db.ruleCards.update(id, {
+        exampleWordIds: examples,
+        unlocked: true,
+        updatedAt: Date.now(),
+      })
+    } else {
+      const card: RuleCard = {
+        id,
+        grapheme: m.grapheme,
+        phoneme: m.phoneme,
+        unlocked: true,
+        streakCorrect: 0,
+        exampleWordIds: [wordId],
+        updatedAt: Date.now(),
+      }
+      await db.ruleCards.add(card)
+    }
+  }
+}
+
+/**
+ * 从现有词库的音形映射回填规律卡片。
+ * 解决：旧数据导入时未写卡片 / 重复导入跳过新词路径 导致「有 ph→/f/ 拆解但卡片为 0」。
+ */
+export async function rebuildRuleCardsFromLibrary(): Promise<number> {
+  const allMaps = await db.graphemeMaps.toArray()
+  // 按 wordId 分组处理
+  const byWord = new Map<string, GraphemePhonemeMap[]>()
+  for (const m of allMaps) {
+    const list = byWord.get(m.wordId) ?? []
+    list.push(m)
+    byWord.set(m.wordId, list)
+  }
+
+  for (const [wordId, maps] of byWord) {
+    await upsertRuleCardsFromMaps(maps, wordId)
+  }
+
+  return db.ruleCards.count()
+}
+
+export async function listWords(): Promise<WordRecord[]> {
+  return db.words.orderBy('createdAt').reverse().toArray()
+}
+
+export async function getWord(id: string): Promise<WordRecord | undefined> {
+  return db.words.get(id)
+}
+
+/**
+ * 重新查询音标并重建 phoneme / 音形映射 / 规律卡。
+ * 用于「待确认」词在词表/API 增强后的补救。
+ */
+export async function refreshWordIpa(wordId: string): Promise<WordRecord | null> {
+  const word = await db.words.get(wordId)
+  if (!word) return null
+
+  const ipa = await ipaService.lookup(word.word)
+  const hasIpa = Boolean(ipa.ipa)
+
+  // 清掉旧索引
+  await db.wordPhonemes.where('wordId').equals(wordId).delete()
+  await db.graphemeMaps.where('wordId').equals(wordId).delete()
+
+  if (!hasIpa || !ipa.ipa) {
+    await db.words.update(wordId, {
+      ipaFull: null,
+      syllables: null,
+      status: 'pending',
+    })
+    return (await db.words.get(wordId)) ?? null
+  }
+
+  const phonemes = splitPhonemes(ipa.ipa)
+  await db.wordPhonemes.bulkAdd(
+    phonemes.map((p, idx) => ({
+      id: createId('ph'),
+      wordId,
+      phoneme: p,
+      positionInWord: idx,
+      positionInIpa: idx,
+    })),
+  )
+
+  const alignments = alignGraphemePhoneme(word.word, ipa.ipa)
+  const mapRows: GraphemePhonemeMap[] = alignments
+    .filter((a) => a.phoneme)
+    .map((a) => ({
+      id: createId('gp'),
+      wordId,
+      grapheme: a.grapheme,
+      phoneme: a.phoneme,
+      startIndex: a.startIndex,
+      endIndex: a.endIndex,
+      confidence: a.confidence,
+    }))
+  if (mapRows.length) await db.graphemeMaps.bulkAdd(mapRows)
+  await upsertRuleCardsFromMaps(mapRows, wordId)
+
+  await db.words.update(wordId, {
+    ipaFull: ipa.ipa,
+    syllables: ipa.syllables,
+    status: 'normal',
+  })
+
+  await rebuildRuleCardsFromLibrary()
+  return (await db.words.get(wordId)) ?? null
+}
+
+/** 批量刷新所有待确认词 */
+export async function refreshAllPendingWords(): Promise<number> {
+  const pending = await db.words.filter((w) => w.status === 'pending' || !w.ipaFull).toArray()
+  let ok = 0
+  for (const w of pending) {
+    const updated = await refreshWordIpa(w.id)
+    if (updated?.status === 'normal') ok += 1
+  }
+  return ok
+}
+
+export async function getGraphemeMaps(wordId: string): Promise<GraphemePhonemeMap[]> {
+  return db.graphemeMaps.where('wordId').equals(wordId).toArray()
+}
+
+export async function getWordPhonemes(wordId: string): Promise<WordPhoneme[]> {
+  return db.wordPhonemes.where('wordId').equals(wordId).toArray()
+}
+
+export async function findWordsByPhoneme(phoneme: string): Promise<
+  Array<{
+    word: WordRecord
+    maps: GraphemePhonemeMap[]
+    matchedGrapheme: string | null
+  }>
+> {
+  const rows = await db.wordPhonemes.where('phoneme').equals(phoneme).toArray()
+  const wordIds = Array.from(new Set(rows.map((r) => r.wordId)))
+  const results: Array<{
+    word: WordRecord
+    maps: GraphemePhonemeMap[]
+    matchedGrapheme: string | null
+  }> = []
+
+  for (const wid of wordIds) {
+    const word = await db.words.get(wid)
+    if (!word || word.status === 'ignored') continue
+    const maps = await getGraphemeMaps(wid)
+    const match = maps.find((m) => m.phoneme === phoneme || m.phoneme.includes(phoneme))
+    results.push({
+      word,
+      maps,
+      matchedGrapheme: match?.grapheme ?? null,
+    })
+  }
+
+  return results.sort((a, b) => a.word.word.localeCompare(b.word.word))
+}
+
+export async function listUsedPhonemes(): Promise<string[]> {
+  const all = await db.wordPhonemes.toArray()
+  // 过滤切分噪声（如单独的括号、空串）
+  const valid = all
+    .map((p) => p.phoneme)
+    .filter((p) => p && p.length > 0 && !/^[()[\]\/.\s]+$/.test(p))
+  return Array.from(new Set(valid)).sort()
+}
+
+export async function listRuleCards(): Promise<RuleCard[]> {
+  // 每次读取前轻量回填，保证拆解页已有 ph→/f/ 时卡片能亮
+  await rebuildRuleCardsFromLibrary()
+  // 注意：updatedAt 未建 Dexie 索引，不能 orderBy('updatedAt')，否则会抛错导致 UI 一直显示 0
+  const cards = await db.ruleCards.toArray()
+  return cards.sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
+}
+
+export async function bumpRuleStreak(grapheme: string, phoneme: string, correct: boolean) {
+  const id = `rule_${grapheme}_${phoneme}`
+  const card = await db.ruleCards.get(id)
+  if (!card) return
+  await db.ruleCards.update(id, {
+    streakCorrect: correct ? card.streakCorrect + 1 : 0,
+    updatedAt: Date.now(),
+  })
+}
+
+export async function countStats() {
+  await rebuildRuleCardsFromLibrary()
+  const [wordCount, phonemeRows, ruleCount] = await Promise.all([
+    db.words.count(),
+    db.wordPhonemes.toArray(),
+    db.ruleCards.filter((c) => c.unlocked).count(),
+  ])
+  const phonemeCount = new Set(phonemeRows.map((p) => p.phoneme)).size
+  return { wordCount, phonemeCount, ruleCount }
+}
+
+/** 删除单个单词及其音标索引、音形映射，并清理规律卡例词 */
+export async function deleteWord(wordId: string): Promise<void> {
+  await db.transaction(
+    'rw',
+    db.words,
+    db.wordPhonemes,
+    db.graphemeMaps,
+    db.ruleCards,
+    async () => {
+      await db.words.delete(wordId)
+      await db.wordPhonemes.where('wordId').equals(wordId).delete()
+      await db.graphemeMaps.where('wordId').equals(wordId).delete()
+
+      const cards = await db.ruleCards.toArray()
+      for (const c of cards) {
+        if (!c.exampleWordIds.includes(wordId)) continue
+        const examples = c.exampleWordIds.filter((id) => id !== wordId)
+        if (examples.length === 0) {
+          await db.ruleCards.delete(c.id)
+        } else {
+          await db.ruleCards.update(c.id, {
+            exampleWordIds: examples,
+            updatedAt: Date.now(),
+          })
+        }
+      }
+    },
+  )
+}
+
+export async function clearAllData() {
+  await Promise.all([
+    db.imports.clear(),
+    db.words.clear(),
+    db.wordPhonemes.clear(),
+    db.graphemeMaps.clear(),
+    db.ruleCards.clear(),
+    db.practiceMistakes.clear(),
+  ])
+}
