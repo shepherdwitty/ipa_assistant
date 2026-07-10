@@ -21,7 +21,7 @@ export function Layout() {
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto px-4 py-4 pb-24">
+      <main id="app-scroll" className="flex-1 overflow-y-auto px-4 py-4 pb-24">
         <Outlet />
       </main>
 

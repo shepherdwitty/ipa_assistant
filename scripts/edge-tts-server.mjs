@@ -12,7 +12,7 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import { EdgeTTS } from 'node-edge-tts'
 
-const PORT = Number(process.env.TTS_PORT || 8787)
+const PORT = Number(process.env.TTS_PORT || 17322)
 const DEFAULT_VOICE = process.env.TTS_VOICE || 'en-GB-SoniaNeural'
 const DEFAULT_LANG = process.env.TTS_LANG || 'en-GB'
 const MAX_TEXT = 80

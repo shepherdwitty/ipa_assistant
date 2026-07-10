@@ -4,6 +4,7 @@ import { AlignmentView } from '../components/AlignmentView'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { deleteWord, getGraphemeMaps, getWord, refreshWordIpa } from '../db/repos'
 import type { GraphemePhonemeMap, WordRecord } from '../db/schema'
+import { speakWord } from '../services/speech/speakPhoneme'
 
 /** 从规律卡片 / 词库等入口带入，用于正确返回上一页 */
 export type WordDetailLocationState = {
@@ -42,6 +43,12 @@ export function WordDetailPage() {
     if (!wordId) return
     void load(wordId)
   }, [wordId])
+
+  // 进入详情后自动朗读单词（词库 / 规律卡片等入口一致）
+  useEffect(() => {
+    if (!word?.word) return
+    void speakWord(word.word)
+  }, [word?.id, word?.word])
 
   async function handleRetry() {
     if (!wordId) return

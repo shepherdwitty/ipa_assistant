@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { PhonemeCard } from '../components/PhonemeCard'
@@ -13,16 +13,23 @@ import {
 } from '../db/repos'
 import type { WordRecord } from '../db/schema'
 import { formatPhoneme, normalizePhonemeQuery } from '../domain/phonemeSplit'
-
-type Tab = 'words' | 'phonemes'
+import {
+  getAppScrollRoot,
+  loadLibraryUi,
+  readScrollTop,
+  saveLibraryUi,
+  writeScrollTop,
+  type LibraryTab,
+} from './libraryUiState'
 
 export function LibraryPage() {
   const navigate = useNavigate()
-  const [tab, setTab] = useState<Tab>('phonemes')
+  const initial = loadLibraryUi()
+  const [tab, setTab] = useState<LibraryTab>(initial.tab)
   const [words, setWords] = useState<WordRecord[]>([])
   const [usedPhonemes, setUsedPhonemes] = useState<string[]>([])
-  const [query, setQuery] = useState('')
-  const [activePhoneme, setActivePhoneme] = useState<string | null>(null)
+  const [query, setQuery] = useState(initial.query)
+  const [activePhoneme, setActivePhoneme] = useState<string | null>(initial.activePhoneme)
   const [results, setResults] = useState<
     Array<{ word: WordRecord; matchedGrapheme: string | null }>
   >([])
@@ -42,6 +49,53 @@ export function LibraryPage() {
     void refresh()
   }, [])
 
+  // 持久化 Tab / 搜索 / 选中音标
+  useEffect(() => {
+    saveLibraryUi({ tab, query, activePhoneme })
+  }, [tab, query, activePhoneme])
+
+  // 滚动监听：按 Tab 分别记住高度；离开页面时再写一次
+  useEffect(() => {
+    const main = getAppScrollRoot()
+    if (!main) return
+
+    let ticking = false
+    const onScroll = () => {
+      if (ticking) return
+      ticking = true
+      requestAnimationFrame(() => {
+        saveLibraryUi({ scrollByTab: { [tab]: main.scrollTop } })
+        ticking = false
+      })
+    }
+    main.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      saveLibraryUi({
+        tab,
+        query,
+        activePhoneme,
+        scrollByTab: { [tab]: main.scrollTop },
+      })
+      main.removeEventListener('scroll', onScroll)
+    }
+  }, [tab, query, activePhoneme])
+
+  // 进入页 / 数据就绪后恢复滚动（例词列表晚到时再补一次）
+  const pendingScrollRestore = useRef(true)
+  useEffect(() => {
+    if (loading || !pendingScrollRestore.current) return
+    const top = loadLibraryUi().scrollByTab[tab] ?? 0
+    const apply = () => writeScrollTop(top)
+    requestAnimationFrame(() => {
+      requestAnimationFrame(apply)
+    })
+    const t = window.setTimeout(() => {
+      apply()
+      pendingScrollRestore.current = false
+    }, 120)
+    return () => window.clearTimeout(t)
+  }, [loading, tab, results.length])
+
   useEffect(() => {
     if (!activePhoneme) {
       setResults([])
@@ -54,7 +108,6 @@ export function LibraryPage() {
 
   const phonemeCounts = useMemo(() => {
     const map = new Map<string, number>()
-    // 仅展示数量需要异步；这里用 used 列表做占位，点击再查
     for (const p of usedPhonemes) map.set(p, (map.get(p) ?? 0) + 1)
     return map
   }, [usedPhonemes])
@@ -70,10 +123,25 @@ export function LibraryPage() {
     )
   }, [words, query])
 
+  function switchTab(next: LibraryTab) {
+    if (next === tab) return
+    // 离开当前 Tab 前记下滚动
+    saveLibraryUi({
+      tab: next,
+      scrollByTab: { [tab]: readScrollTop() },
+    })
+    setTab(next)
+    // 切到目标 Tab 的历史滚动
+    const top = loadLibraryUi().scrollByTab[next] ?? 0
+    requestAnimationFrame(() => {
+      writeScrollTop(top)
+    })
+  }
+
   function handleSearchPhoneme() {
     const p = normalizePhonemeQuery(query)
     if (!p) return
-    setTab('phonemes')
+    switchTab('phonemes')
     setActivePhoneme(p)
   }
 
@@ -120,7 +188,7 @@ export function LibraryPage() {
           <button
             key={key}
             type="button"
-            onClick={() => setTab(key)}
+            onClick={() => switchTab(key)}
             className={[
               'flex-1 rounded-xl py-2 text-sm font-medium transition',
               tab === key ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500',
