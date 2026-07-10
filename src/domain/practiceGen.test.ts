@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
+import { CHINA_48_PHONEMES } from '../data/phoneme-audio-map'
 import type { GraphemePhonemeMap } from '../db/schema'
-import { selectPracticePairs } from './practiceGen'
+import {
+  checkListenChoose,
+  generateListenChoose,
+  generateListenChooseSession,
+  LISTEN_CHOOSE_SESSION_SIZE,
+  pickListenChooseDistractors,
+  selectPracticePairs,
+} from './practiceGen'
 
 function map(
   grapheme: string,
@@ -48,5 +56,43 @@ describe('selectPracticePairs', () => {
     ])
     expect(pairs.some((p) => p.grapheme === 'ei' && p.phoneme === 'iː')).toBe(true)
     expect(pairs.every((p) => p.grapheme !== 'e' || p.phoneme !== 'iː')).toBe(true)
+  })
+})
+
+describe('listen-choose', () => {
+  it('picks 3 distractors without the answer', () => {
+    for (const answer of ['iː', 'θ', 'tʃ', 'ŋ'] as const) {
+      const d = pickListenChooseDistractors(answer, 3)
+      expect(d).toHaveLength(3)
+      expect(new Set(d).size).toBe(3)
+      expect(d.includes(answer)).toBe(false)
+      for (const p of d) {
+        expect(CHINA_48_PHONEMES.includes(p as (typeof CHINA_48_PHONEMES)[number])).toBe(
+          true,
+        )
+      }
+    }
+  })
+
+  it('generates a 4-option question including the answer', () => {
+    const q = generateListenChoose('ʃ')
+    expect(q.kind).toBe('listen-choose')
+    expect(q.answer).toBe('ʃ')
+    expect(q.options).toHaveLength(4)
+    expect(new Set(q.options).size).toBe(4)
+    expect(q.options).toContain('ʃ')
+  })
+
+  it('builds a 30-question session with unique answers', () => {
+    const session = generateListenChooseSession()
+    expect(session).toHaveLength(LISTEN_CHOOSE_SESSION_SIZE)
+    const answers = session.map((q) => q.answer)
+    expect(new Set(answers).size).toBe(LISTEN_CHOOSE_SESSION_SIZE)
+    for (const q of session) {
+      expect(q.options).toHaveLength(4)
+      expect(q.options).toContain(q.answer)
+      expect(checkListenChoose(q, q.answer)).toBe(true)
+      expect(checkListenChoose(q, q.options.find((o) => o !== q.answer))).toBe(false)
+    }
   })
 })

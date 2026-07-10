@@ -1,7 +1,11 @@
+import { CHINA_48_PHONEMES } from '../data/phoneme-audio-map'
 import type { GraphemePhonemeMap, WordRecord } from '../db/schema'
 import { isAlignmentUnitReliable } from './alignGrapheme'
 
-export type PracticeKind = 'phoneme-find' | 'pair-match'
+export type PracticeKind = 'phoneme-find' | 'pair-match' | 'listen-choose'
+
+/** 听音选音标：一次完整测试题量 */
+export const LISTEN_CHOOSE_SESSION_SIZE = 30
 
 export interface PhonemeFindQuestion {
   kind: 'phoneme-find'
@@ -19,7 +23,18 @@ export interface PairMatchQuestion {
   pairs: Array<{ grapheme: string; phoneme: string }>
 }
 
-export type PracticeQuestion = PhonemeFindQuestion | PairMatchQuestion
+export interface ListenChooseQuestion {
+  kind: 'listen-choose'
+  /** 正确答案音标 */
+  answer: string
+  /** 4 个选项（含正确答案，已乱序） */
+  options: string[]
+}
+
+export type PracticeQuestion =
+  | PhonemeFindQuestion
+  | PairMatchQuestion
+  | ListenChooseQuestion
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr]
@@ -28,6 +43,153 @@ function shuffle<T>(arr: T[]): T[] {
     ;[a[i], a[j]] = [a[j], a[i]]
   }
   return a
+}
+
+// ---------- 听音选音标：相近干扰项 ----------
+
+/**
+ * 教学向易混簇：同簇内互为干扰项（长短元音、清浊对立、破擦相近等）。
+ * 一个音标可属于多簇，生成时会合并。
+ */
+const CONFUSABLE_CLUSTERS: readonly (readonly string[])[] = [
+  // 前元音 / 相关双元音
+  ['iː', 'ɪ', 'e', 'eɪ'],
+  ['e', 'æ', 'eɪ', 'eə'],
+  ['æ', 'e', 'ʌ', 'ɑː'],
+  // 后/中元音
+  ['ɑː', 'ʌ', 'ɒ', 'ɔː'],
+  ['ɒ', 'ɔː', 'əʊ', 'ɑː'],
+  ['ʊ', 'uː', 'əʊ', 'ɔː'],
+  ['uː', 'ʊ', 'əʊ', 'ɔː'],
+  ['ʌ', 'ə', 'ɜː', 'ɑː'],
+  ['ɜː', 'ə', 'e', 'ʌ'],
+  ['ə', 'ɜː', 'ʌ', 'ʊ'],
+  // 双元音
+  ['eɪ', 'aɪ', 'ɔɪ', 'e'],
+  ['aɪ', 'aʊ', 'eɪ', 'ɔɪ'],
+  ['ɔɪ', 'ɔː', 'aɪ', 'əʊ'],
+  ['əʊ', 'aʊ', 'ɔː', 'ʊ'],
+  ['aʊ', 'aɪ', 'əʊ', 'ɑː'],
+  ['ɪə', 'eə', 'ʊə', 'ɪ'],
+  ['eə', 'ɪə', 'eɪ', 'e'],
+  ['ʊə', 'ʊ', 'uː', 'ə'],
+  // 爆破
+  ['p', 'b', 't', 'd'],
+  ['t', 'd', 'k', 'ɡ'],
+  ['k', 'ɡ', 't', 'd'],
+  // 摩擦
+  ['f', 'v', 'θ', 'ð'],
+  ['θ', 'ð', 's', 'z'],
+  ['s', 'z', 'ʃ', 'ʒ'],
+  ['ʃ', 'ʒ', 'tʃ', 'dʒ'],
+  ['h', 'f', 'θ', 's'],
+  // 破擦 / 教材扩展
+  ['tʃ', 'dʒ', 'tr', 'dr'],
+  ['ts', 'dz', 'tʃ', 'dʒ'],
+  ['tr', 'dr', 'tʃ', 'dʒ'],
+  // 鼻音 / 边音 / 半元音
+  ['m', 'n', 'ŋ', 'l'],
+  ['n', 'ŋ', 'm', 'l'],
+  ['l', 'r', 'n', 'w'],
+  ['r', 'l', 'w', 'j'],
+  ['j', 'w', 'r', 'iː'],
+  ['w', 'v', 'r', 'ʊ'],
+]
+
+const MONOPHTHONGS = new Set(CHINA_48_PHONEMES.slice(0, 12))
+const DIPHTHONGS = new Set(CHINA_48_PHONEMES.slice(12, 20))
+
+function phonemeCategory(p: string): 'mono' | 'dip' | 'con' {
+  if (MONOPHTHONGS.has(p)) return 'mono'
+  if (DIPHTHONGS.has(p)) return 'dip'
+  return 'con'
+}
+
+/** 每个音标 → 易混干扰候选（不含自身） */
+function buildConfusableMap(): Map<string, string[]> {
+  const map = new Map<string, Set<string>>()
+  for (const p of CHINA_48_PHONEMES) map.set(p, new Set())
+  for (const cluster of CONFUSABLE_CLUSTERS) {
+    for (const p of cluster) {
+      if (!map.has(p)) continue
+      for (const q of cluster) {
+        if (q !== p && map.has(q)) map.get(p)!.add(q)
+      }
+    }
+  }
+  return new Map([...map.entries()].map(([k, v]) => [k, [...v]]))
+}
+
+const CONFUSABLE_MAP = buildConfusableMap()
+
+/**
+ * 为正确答案挑选 3 个干扰项：优先易混簇，其次同大类，最后全库补齐。
+ */
+export function pickListenChooseDistractors(
+  answer: string,
+  count = 3,
+): string[] {
+  const pool = new Set<string>()
+  const confusable = CONFUSABLE_MAP.get(answer) ?? []
+  for (const p of shuffle(confusable)) {
+    if (p === answer) continue
+    pool.add(p)
+    if (pool.size >= count) break
+  }
+
+  if (pool.size < count) {
+    const cat = phonemeCategory(answer)
+    const sameCat = CHINA_48_PHONEMES.filter(
+      (p) => p !== answer && phonemeCategory(p) === cat && !pool.has(p),
+    )
+    for (const p of shuffle(sameCat)) {
+      pool.add(p)
+      if (pool.size >= count) break
+    }
+  }
+
+  if (pool.size < count) {
+    const rest = CHINA_48_PHONEMES.filter((p) => p !== answer && !pool.has(p))
+    for (const p of shuffle(rest)) {
+      pool.add(p)
+      if (pool.size >= count) break
+    }
+  }
+
+  return [...pool].slice(0, count)
+}
+
+/** 生成单道听音选音标题 */
+export function generateListenChoose(answer?: string): ListenChooseQuestion {
+  const ans =
+    answer && CHINA_48_PHONEMES.includes(answer as (typeof CHINA_48_PHONEMES)[number])
+      ? answer
+      : shuffle([...CHINA_48_PHONEMES])[0]
+  const distractors = pickListenChooseDistractors(ans, 3)
+  return {
+    kind: 'listen-choose',
+    answer: ans,
+    options: shuffle([ans, ...distractors]),
+  }
+}
+
+/**
+ * 生成一整轮测试（默认 30 题）。
+ * 正确答案在 48 音标中无放回抽样，避免一轮内重复听同一音。
+ */
+export function generateListenChooseSession(
+  size = LISTEN_CHOOSE_SESSION_SIZE,
+): ListenChooseQuestion[] {
+  const n = Math.min(Math.max(1, size), CHINA_48_PHONEMES.length)
+  const answers = shuffle([...CHINA_48_PHONEMES]).slice(0, n)
+  return answers.map((a) => generateListenChoose(a))
+}
+
+export function checkListenChoose(
+  q: ListenChooseQuestion,
+  selected: string | null | undefined,
+): boolean {
+  return selected === q.answer
 }
 
 export function generatePhonemeFind(
