@@ -26,6 +26,7 @@ const MULTI_PHONEMES = [
   'ɪə',
   'ʊə',
   'ɔɪ',
+  'oɪ', // 归一化前的词典写法；normalize 后一般为 ɔɪ
   'əʊ',
   'oʊ',
   'ɑː',
@@ -43,8 +44,8 @@ const MULTI_PHONEMES = [
   'ɡ',
 ]
 
-/** 非音素字符：装饰/空白，切分时跳过 */
-const SKIP_CHARS = /[ˈˌ.\s\-ʰʲʷˠˤʼ]/
+/** 非音素字符：装饰/空白/可选音括号，切分时跳过 */
+const SKIP_CHARS = /[ˈˌ.\s\-ʰʲʷˠˤʼ()]/
 
 export function splitPhonemes(ipaFull: string): string[] {
   const raw = stripIpaSlashes(ipaFull)

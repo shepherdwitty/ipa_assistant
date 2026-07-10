@@ -1,4 +1,5 @@
-import { alignGraphemePhoneme } from '../domain/alignGrapheme'
+import { alignGraphemePhoneme, isAlignmentUnitReliable } from '../domain/alignGrapheme'
+import { normalizeTeachingIpa } from '../domain/normalizeIpa'
 import { splitPhonemes } from '../domain/phonemeSplit'
 import { normalizeWord } from '../domain/wordClean'
 import { ipaService } from '../services/ipa/ipaService'
@@ -110,11 +111,12 @@ export async function confirmImport(
 
         const ipa = item.ipa!
         const hasIpa = Boolean(ipa.ipa)
+        const normalizedIpa = hasIpa && ipa.ipa ? normalizeTeachingIpa(ipa.ipa) : null
         const wordRec: WordRecord = {
           id: createId('w'),
           word: item.word,
           normalizedWord: item.normalized,
-          ipaFull: hasIpa ? ipa.ipa : null,
+          ipaFull: normalizedIpa,
           syllables: ipa.syllables,
           sourceImportId: importId,
           status: hasIpa ? 'normal' : 'pending',
@@ -123,8 +125,8 @@ export async function confirmImport(
         await db.words.add(wordRec)
         created.push(wordRec)
 
-        if (hasIpa && ipa.ipa) {
-          const phonemes = splitPhonemes(ipa.ipa)
+        if (normalizedIpa) {
+          const phonemes = splitPhonemes(normalizedIpa)
           const phonemeRows: WordPhoneme[] = phonemes.map((p, idx) => ({
             id: createId('ph'),
             wordId: wordRec.id,
@@ -134,7 +136,7 @@ export async function confirmImport(
           }))
           await db.wordPhonemes.bulkAdd(phonemeRows)
 
-          const alignments = alignGraphemePhoneme(item.word, ipa.ipa)
+          const alignments = alignGraphemePhoneme(item.word, normalizedIpa)
           const mapRows: GraphemePhonemeMap[] = alignments
             .filter((a) => a.phoneme)
             .map((a) => ({
@@ -165,14 +167,10 @@ export async function confirmImport(
   return created
 }
 
-/** 多字母组合 + 一定置信度 → 可做成规律卡片（如 ph→/f/） */
+/** 多字母组合 + 可靠对齐 → 规律卡片（如 ph→/f/） */
 function isRuleCardWorthy(m: Pick<GraphemePhonemeMap, 'grapheme' | 'phoneme' | 'confidence'>): boolean {
-  if (!m.grapheme || !m.phoneme) return false
   if (m.grapheme.length < 2) return false
-  // 略放宽：0.55 以上即可（与练习过滤接近），避免 ph 等规则对上了却不进卡片
-  if (m.confidence < 0.55) return false
-  if (/^[ʰʲʷˈˌ.\s]+$/.test(m.phoneme)) return false
-  return true
+  return isAlignmentUnitReliable(m)
 }
 
 async function upsertRuleCardsFromMaps(
@@ -202,6 +200,77 @@ async function upsertRuleCardsFromMaps(
       }
       await db.ruleCards.add(card)
     }
+  }
+}
+
+/**
+ * 用已存 IPA 重新归一化并重建音素切分 / 音形对齐（不重新请求 API）。
+ * 用于算法升级后修复本地旧数据，例如 oɪ→ɔɪ 导致 appointee 字母与音标错位。
+ */
+export async function realignAllWordsFromStoredIpa(): Promise<number> {
+  const words = await db.words.filter((w) => Boolean(w.ipaFull)).toArray()
+  let updated = 0
+
+  for (const word of words) {
+    if (!word.ipaFull) continue
+    const ipa = normalizeTeachingIpa(word.ipaFull)
+    const phonemes = splitPhonemes(ipa)
+    const alignments = alignGraphemePhoneme(word.word, ipa)
+
+    await db.wordPhonemes.where('wordId').equals(word.id).delete()
+    await db.graphemeMaps.where('wordId').equals(word.id).delete()
+
+    if (phonemes.length) {
+      await db.wordPhonemes.bulkAdd(
+        phonemes.map((p, idx) => ({
+          id: createId('ph'),
+          wordId: word.id,
+          phoneme: p,
+          positionInWord: idx,
+          positionInIpa: idx,
+        })),
+      )
+    }
+
+    const mapRows: GraphemePhonemeMap[] = alignments
+      .filter((a) => a.phoneme)
+      .map((a) => ({
+        id: createId('gp'),
+        wordId: word.id,
+        grapheme: a.grapheme,
+        phoneme: a.phoneme,
+        startIndex: a.startIndex,
+        endIndex: a.endIndex,
+        confidence: a.confidence,
+      }))
+    if (mapRows.length) await db.graphemeMaps.bulkAdd(mapRows)
+
+    if (word.ipaFull !== ipa) {
+      await db.words.update(word.id, { ipaFull: ipa })
+    }
+    updated += 1
+  }
+
+  // 卡片依赖 graphemeMaps，需全量重建以免残留错误规则
+  await db.ruleCards.clear()
+  await rebuildRuleCardsFromLibrary()
+  return updated
+}
+
+/** 本地对齐算法版本；升级后触发一次 realignAllWordsFromStoredIpa */
+export const ALIGNMENT_DATA_VERSION = 6
+
+const ALIGNMENT_VERSION_KEY = 'ipa-kids-alignment-version'
+
+/** App 启动时调用：若算法版本变更则重对齐本地词库 */
+export async function migrateAlignmentIfNeeded(): Promise<void> {
+  try {
+    const current = Number(localStorage.getItem(ALIGNMENT_VERSION_KEY) || '0')
+    if (current >= ALIGNMENT_DATA_VERSION) return
+    await realignAllWordsFromStoredIpa()
+    localStorage.setItem(ALIGNMENT_VERSION_KEY, String(ALIGNMENT_DATA_VERSION))
+  } catch {
+    // 迁移失败不阻塞 UI；下次启动会重试
   }
 }
 
@@ -258,7 +327,9 @@ export async function refreshWordIpa(wordId: string): Promise<WordRecord | null>
     return (await db.words.get(wordId)) ?? null
   }
 
-  const phonemes = splitPhonemes(ipa.ipa)
+  // 再走一遍教学归一化，防止上游偶发未归一化（如 oɪ vs ɔɪ）
+  const normalizedIpa = normalizeTeachingIpa(ipa.ipa)
+  const phonemes = splitPhonemes(normalizedIpa)
   await db.wordPhonemes.bulkAdd(
     phonemes.map((p, idx) => ({
       id: createId('ph'),
@@ -269,7 +340,7 @@ export async function refreshWordIpa(wordId: string): Promise<WordRecord | null>
     })),
   )
 
-  const alignments = alignGraphemePhoneme(word.word, ipa.ipa)
+  const alignments = alignGraphemePhoneme(word.word, normalizedIpa)
   const mapRows: GraphemePhonemeMap[] = alignments
     .filter((a) => a.phoneme)
     .map((a) => ({
@@ -285,7 +356,7 @@ export async function refreshWordIpa(wordId: string): Promise<WordRecord | null>
   await upsertRuleCardsFromMaps(mapRows, wordId)
 
   await db.words.update(wordId, {
-    ipaFull: ipa.ipa,
+    ipaFull: normalizedIpa,
     syllables: ipa.syllables,
     status: 'normal',
   })

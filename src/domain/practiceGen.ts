@@ -1,4 +1,5 @@
 import type { GraphemePhonemeMap, WordRecord } from '../db/schema'
+import { isAlignmentUnitReliable } from './alignGrapheme'
 
 export type PracticeKind = 'phoneme-find' | 'pair-match'
 
@@ -14,7 +15,7 @@ export interface PairMatchQuestion {
   word: WordRecord
   graphemes: string[]
   phonemes: string[]
-  /** grapheme -> phoneme correct mapping */
+  /** grapheme -> phoneme correct mapping（grapheme / phoneme 均唯一） */
   pairs: Array<{ grapheme: string; phoneme: string }>
 }
 
@@ -53,22 +54,48 @@ export function generatePhonemeFind(
   }
 }
 
-/** 练习用配对：过滤低置信度 / 装饰碎片 / 空音标，避免出「e→/ʰ/」这种废题 */
-function isPracticePair(m: GraphemePhonemeMap): boolean {
-  if (!m.grapheme || !m.phoneme) return false
-  if (m.confidence < 0.55) return false
-  // 纯上标/装饰不能当音标选项
+/** 练习用配对：与 isAlignmentUnitReliable 同一套门槛，杜绝吞音废题 */
+export function isPracticePair(m: GraphemePhonemeMap): boolean {
   if (/^[ʰʲʷˈˌ.\s]+$/.test(m.phoneme)) return false
-  // 音标过短且非常见单音素时跳过
-  if (m.phoneme.length === 0) return false
-  return true
+  return isAlignmentUnitReliable(m)
+}
+
+/**
+ * 从词的音形映射里挑练习配对：
+ * 1. 字母组合、音标都唯一（UI 用字符串做 key，重复 e/i/t 会串台）
+ * 2. 优先多字母组合（digraph），再高置信度，再靠前位置
+ * 3. 最多 5 对
+ */
+export function selectPracticePairs(
+  maps: GraphemePhonemeMap[],
+  maxPairs = 5,
+): Array<{ grapheme: string; phoneme: string }> {
+  const usable = maps.filter(isPracticePair)
+  const sorted = [...usable].sort((a, b) => {
+    if (b.grapheme.length !== a.grapheme.length) return b.grapheme.length - a.grapheme.length
+    if (b.confidence !== a.confidence) return b.confidence - a.confidence
+    return a.startIndex - b.startIndex
+  })
+
+  const seenG = new Set<string>()
+  const seenP = new Set<string>()
+  const pairs: Array<{ grapheme: string; phoneme: string }> = []
+
+  for (const m of sorted) {
+    if (seenG.has(m.grapheme) || seenP.has(m.phoneme)) continue
+    seenG.add(m.grapheme)
+    seenP.add(m.phoneme)
+    pairs.push({ grapheme: m.grapheme, phoneme: m.phoneme })
+    if (pairs.length >= maxPairs) break
+  }
+
+  return pairs
 }
 
 /**
  * 拆解配对出题：
- * - 候选 = 至少 2 条可用音形映射的词
- * - 在候选中**均匀随机**（不再 60% 锁死 digraph 最多的词）
- * - 可选 excludeWordId，避免连出同一词
+ * - 候选 = 至少 2 条可用且可去重后仍够 2 对的词
+ * - 均匀随机；可选 excludeWordId 避免连出同一词
  */
 export function generatePairMatch(
   words: WordRecord[],
@@ -77,32 +104,17 @@ export function generatePairMatch(
 ): PairMatchQuestion | null {
   let candidates = words.filter((w) => {
     const maps = mapsByWordId.get(w.id) ?? []
-    return maps.filter(isPracticePair).length >= 2
+    return selectPracticePairs(maps).length >= 2
   })
   if (candidates.length === 0) return null
 
-  // 有多个候选时，尽量不重复上一题
   if (excludeWordId && candidates.length > 1) {
     const without = candidates.filter((w) => w.id !== excludeWordId)
     if (without.length > 0) candidates = without
   }
 
-  // 均匀随机（Fisher–Yates 打乱后取第一个，等价于等概率）
   const word = shuffle(candidates)[0]
-
-  const maps = (mapsByWordId.get(word.id) ?? [])
-    .filter(isPracticePair)
-    .slice(0, 5)
-
-  // 音标选项去重，避免两个相同 /t/ 无法区分
-  const seenPh = new Set<string>()
-  const pairs: Array<{ grapheme: string; phoneme: string }> = []
-  for (const m of maps) {
-    if (seenPh.has(m.phoneme)) continue
-    seenPh.add(m.phoneme)
-    pairs.push({ grapheme: m.grapheme, phoneme: m.phoneme })
-  }
-
+  const pairs = selectPracticePairs(mapsByWordId.get(word.id) ?? [])
   if (pairs.length < 2) return null
 
   return {

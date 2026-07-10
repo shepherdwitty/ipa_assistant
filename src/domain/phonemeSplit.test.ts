@@ -17,4 +17,9 @@ describe('splitPhonemes', () => {
     expect(splitPhonemes('/triː/')).toEqual(['tr', 'iː'])
     expect(splitPhonemes('/drɪŋk/')).toEqual(['dr', 'ɪ', 'ŋ', 'k'])
   })
+
+  it('keeps choice diphthong as one unit for both ɔɪ and oɪ', () => {
+    expect(splitPhonemes('/pɔɪnt/')).toEqual(['p', 'ɔɪ', 'n', 't'])
+    expect(splitPhonemes('/poɪnt/')).toEqual(['p', 'oɪ', 'n', 't'])
+  })
 })

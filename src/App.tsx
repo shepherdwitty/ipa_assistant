@@ -1,5 +1,7 @@
+import { useEffect } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
+import { migrateAlignmentIfNeeded } from './db/repos'
 import { ImportPage } from './pages/ImportPage'
 import { LibraryPage } from './pages/LibraryPage'
 import { PracticePage } from './pages/PracticePage'
@@ -9,6 +11,10 @@ import { RuleCardsPage } from './pages/RuleCardsPage'
 import { WordDetailPage } from './pages/WordDetailPage'
 
 export default function App() {
+  useEffect(() => {
+    void migrateAlignmentIfNeeded()
+  }, [])
+
   return (
     <BrowserRouter>
       <Routes>
