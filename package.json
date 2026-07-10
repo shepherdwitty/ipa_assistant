@@ -77,8 +77,8 @@
       "identity": null
     },
     "dmg": {
-      "artifactName": "${productName}-${version}-mac-${arch}.${ext}"
+      "artifactName": "IPA-Assistant-${version}-mac-${arch}.${ext}"
     },
-    "artifactName": "${productName}-${version}-mac-${arch}.${ext}"
+    "artifactName": "IPA-Assistant-${version}-mac-${arch}.${ext}"
   }
 }

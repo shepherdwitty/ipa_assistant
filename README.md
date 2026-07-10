@@ -75,8 +75,8 @@
 ### 安装
 
 ```bash
-git clone <你的仓库地址>.git
-cd IPA   # 或你的目录名
+git clone https://github.com/shepherdwitty/ipa_assistant.git
+cd ipa_assistant
 npm install
 ```
 
