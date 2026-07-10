@@ -48,7 +48,7 @@ export function ConfirmModal({
           if (!loading) onCancel()
         }}
       />
-      <div className="relative w-full max-w-sm rounded-3xl bg-white p-5 shadow-xl">
+      <div className="relative w-full max-w-sm rounded-3xl bg-white p-5 shadow-xl md:max-w-md">
         <h2 id="confirm-modal-title" className="text-lg font-bold text-slate-900">
           {title}
         </h2>

@@ -51,12 +51,12 @@ export function RuleCardsPage() {
           </Link>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {cards.map((c) => (
             <button
               key={c.id}
               type="button"
-              className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white px-3 py-4 text-center transition active:scale-[0.98]"
+              className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white px-3 py-4 text-center transition hover:border-amber-300 active:scale-[0.98]"
               onClick={() => {
                 void speakPhoneme(c.phoneme)
                 navigate(`/practice/rules/${encodeURIComponent(c.id)}`)

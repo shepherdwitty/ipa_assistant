@@ -87,72 +87,100 @@ export function ImportPage() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-3xl bg-gradient-to-br from-brand-600 to-brand-800 p-5 text-white shadow-lg">
-        <h2 className="text-xl font-bold">拍照即建库</h2>
-        <p className="mt-2 text-sm leading-relaxed text-brand-100">
-          拍摄绘本、单词卡或上传截图，快速整理英文单词与英式音标，方便边讲边看。
-        </p>
-        <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
-          <div className="rounded-2xl bg-white/10 px-2 py-3">
-            <div className="text-lg font-bold">{stats.wordCount}</div>
-            <div className="text-brand-100">单词</div>
+      <section className="rounded-3xl bg-gradient-to-br from-brand-600 to-brand-800 p-5 text-white shadow-lg md:p-7">
+        <div className="md:flex md:items-end md:justify-between md:gap-8">
+          <div className="md:max-w-xl">
+            <h2 className="text-xl font-bold md:text-2xl">拍照即建库</h2>
+            <p className="mt-2 text-sm leading-relaxed text-brand-100 md:text-base">
+              拍摄绘本、单词卡或上传截图，快速整理英文单词与英式音标，方便边讲边看。
+            </p>
           </div>
-          <div className="rounded-2xl bg-white/10 px-2 py-3">
-            <div className="text-lg font-bold">{stats.phonemeCount}</div>
-            <div className="text-brand-100">音标</div>
-          </div>
-          <div className="rounded-2xl bg-white/10 px-2 py-3">
-            <div className="text-lg font-bold">{stats.ruleCount}</div>
-            <div className="text-brand-100">规律</div>
+          <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs md:mt-0 md:min-w-[280px] md:gap-3">
+            <div className="rounded-2xl bg-white/10 px-2 py-3">
+              <div className="text-lg font-bold md:text-xl">{stats.wordCount}</div>
+              <div className="text-brand-100">单词</div>
+            </div>
+            <div className="rounded-2xl bg-white/10 px-2 py-3">
+              <div className="text-lg font-bold md:text-xl">{stats.phonemeCount}</div>
+              <div className="text-brand-100">音标</div>
+            </div>
+            <div className="rounded-2xl bg-white/10 px-2 py-3">
+              <div className="text-lg font-bold md:text-xl">{stats.ruleCount}</div>
+              <div className="text-brand-100">规律</div>
+            </div>
           </div>
         </div>
       </section>
 
-      <section className="grid grid-cols-2 gap-3">
-        <button
-          type="button"
-          disabled={phase === 'ocr' || phase === 'clean'}
-          onClick={() => cameraRef.current?.click()}
-          className="rounded-3xl border border-brand-200 bg-brand-50 px-4 py-8 text-center shadow-sm active:scale-[0.98] disabled:opacity-60"
-        >
-          <div className="text-2xl">📷</div>
-          <div className="mt-2 font-semibold text-brand-800">拍照导入</div>
-          <div className="mt-1 text-xs text-brand-600">调用相机</div>
-        </button>
-        <button
-          type="button"
-          disabled={phase === 'ocr' || phase === 'clean'}
-          onClick={() => galleryRef.current?.click()}
-          className="rounded-3xl border border-slate-200 bg-white px-4 py-8 text-center shadow-sm active:scale-[0.98] disabled:opacity-60"
-        >
-          <div className="text-2xl">🖼️</div>
-          <div className="mt-2 font-semibold text-slate-800">上传图片</div>
-          <div className="mt-1 text-xs text-slate-500">相册 / 截图</div>
-        </button>
-        <input
-          ref={cameraRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          className="hidden"
-          onChange={(e) => {
-            const f = e.target.files?.[0]
-            if (f) void handleFile(f, 'camera')
-            e.target.value = ''
-          }}
-        />
-        <input
-          ref={galleryRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={(e) => {
-            const f = e.target.files?.[0]
-            if (f) void handleFile(f, 'gallery')
-            e.target.value = ''
-          }}
-        />
-      </section>
+      {/* 平板/桌面：导入操作与手动补录并排 */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <section className="grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            disabled={phase === 'ocr' || phase === 'clean'}
+            onClick={() => cameraRef.current?.click()}
+            className="rounded-3xl border border-brand-200 bg-brand-50 px-4 py-8 text-center shadow-sm transition active:scale-[0.98] disabled:opacity-60 md:py-10"
+          >
+            <div className="text-2xl">📷</div>
+            <div className="mt-2 font-semibold text-brand-800">拍照导入</div>
+            <div className="mt-1 text-xs text-brand-600">调用相机</div>
+          </button>
+          <button
+            type="button"
+            disabled={phase === 'ocr' || phase === 'clean'}
+            onClick={() => galleryRef.current?.click()}
+            className="rounded-3xl border border-slate-200 bg-white px-4 py-8 text-center shadow-sm transition active:scale-[0.98] disabled:opacity-60 md:py-10"
+          >
+            <div className="text-2xl">🖼️</div>
+            <div className="mt-2 font-semibold text-slate-800">上传图片</div>
+            <div className="mt-1 text-xs text-slate-500">相册 / 截图</div>
+          </button>
+          <input
+            ref={cameraRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              if (f) void handleFile(f, 'camera')
+              e.target.value = ''
+            }}
+          />
+          <input
+            ref={galleryRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              if (f) void handleFile(f, 'gallery')
+              e.target.value = ''
+            }}
+          />
+        </section>
+
+        <section className="rounded-3xl border border-slate-200 bg-white p-4 md:p-5">
+          <h3 className="font-semibold text-slate-800">手动补录单词</h3>
+          <p className="mt-1 text-xs text-slate-500">
+            OCR 不完美时，可直接粘贴或输入英文单词（空格/逗号分隔）
+          </p>
+          <textarea
+            value={manual}
+            onChange={(e) => setManual(e.target.value)}
+            rows={3}
+            placeholder="例如：phone fish ship green"
+            className="mt-3 w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm outline-none focus:border-brand-400"
+          />
+          <button
+            type="button"
+            onClick={() => void handleManual()}
+            className="mt-3 w-full rounded-2xl bg-brand-700 py-3 text-sm font-semibold text-white active:bg-brand-800"
+          >
+            进入校对并导入
+          </button>
+        </section>
+      </div>
 
       {(phase === 'ocr' || phase === 'clean') && (
         <section className="space-y-3">
@@ -173,37 +201,16 @@ export function ImportPage() {
         </div>
       )}
 
-      <section className="rounded-3xl border border-slate-200 bg-white p-4">
-        <h3 className="font-semibold text-slate-800">手动补录单词</h3>
-        <p className="mt-1 text-xs text-slate-500">
-          OCR 不完美时，可直接粘贴或输入英文单词（空格/逗号分隔）
-        </p>
-        <textarea
-          value={manual}
-          onChange={(e) => setManual(e.target.value)}
-          rows={3}
-          placeholder="例如：phone fish ship green"
-          className="mt-3 w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm outline-none focus:border-brand-400"
-        />
-        <button
-          type="button"
-          onClick={() => void handleManual()}
-          className="mt-3 w-full rounded-2xl bg-brand-700 py-3 text-sm font-semibold text-white active:bg-brand-800"
-        >
-          进入校对并导入
-        </button>
-      </section>
-
-      <div className="flex gap-3 text-sm">
+      <div className="mx-auto flex w-full max-w-md gap-3 text-sm">
         <Link
           to="/library"
-          className="flex-1 rounded-2xl border border-slate-200 py-3 text-center font-medium text-slate-700"
+          className="flex-1 rounded-2xl border border-slate-200 py-3 text-center font-medium text-slate-700 hover:bg-slate-50"
         >
           查看词库
         </Link>
         <Link
           to="/practice"
-          className="flex-1 rounded-2xl border border-slate-200 py-3 text-center font-medium text-slate-700"
+          className="flex-1 rounded-2xl border border-slate-200 py-3 text-center font-medium text-slate-700 hover:bg-slate-50"
         >
           去练习
         </Link>

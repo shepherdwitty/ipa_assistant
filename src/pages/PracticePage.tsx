@@ -158,11 +158,11 @@ export function PracticePage() {
             </Link>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="grid gap-3 md:grid-cols-3">
             <button
               type="button"
               onClick={startPhonemeFind}
-              className="w-full rounded-3xl border border-brand-200 bg-brand-50 px-4 py-5 text-left"
+              className="w-full rounded-3xl border border-brand-200 bg-brand-50 px-4 py-5 text-left transition hover:border-brand-300"
             >
               <div className="text-base font-bold text-brand-900">音标找单词</div>
               <div className="mt-1 text-sm text-brand-700">
@@ -172,7 +172,7 @@ export function PracticePage() {
             <button
               type="button"
               onClick={startPairMatch}
-              className="w-full rounded-3xl border border-slate-200 bg-white px-4 py-5 text-left"
+              className="w-full rounded-3xl border border-slate-200 bg-white px-4 py-5 text-left transition hover:border-slate-300"
             >
               <div className="text-base font-bold text-slate-900">单词拆解配对</div>
               <div className="mt-1 text-sm text-slate-500">
@@ -181,7 +181,7 @@ export function PracticePage() {
             </button>
             <Link
               to="/practice/cards"
-              className="block w-full rounded-3xl border border-amber-200 bg-amber-50 px-4 py-5 text-left"
+              className="block w-full rounded-3xl border border-amber-200 bg-amber-50 px-4 py-5 text-left transition hover:border-amber-300"
             >
               <div className="text-base font-bold text-amber-900">规律卡片</div>
               <div className="mt-1 text-sm text-amber-800">
@@ -294,7 +294,7 @@ function PhonemeFindView({
         </button>
         <p className="mt-2 text-xs text-brand-100/80">点音标可再听一遍</p>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
         {q.options.map((w) => {
           const on = selected.includes(w.id)
           const isCorrect = q.correctIds.includes(w.id)
@@ -428,9 +428,9 @@ function PairMatchView({
         )}
       </button>
 
-      <div>
+      <div className="text-center">
         <h3 className="mb-2 text-sm font-semibold text-slate-600">字母组合</h3>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap justify-center gap-2">
           {remainingGraphemes.map((g) => (
             <button
               key={g}
@@ -449,9 +449,9 @@ function PairMatchView({
         </div>
       </div>
 
-      <div>
+      <div className="text-center">
         <h3 className="mb-2 text-sm font-semibold text-slate-600">音标</h3>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap justify-center gap-2">
           {remainingPhonemes.map((p) => (
             <button
               key={p}
@@ -474,9 +474,9 @@ function PairMatchView({
       </div>
 
       {userPairs.length > 0 ? (
-        <div className="rounded-2xl bg-slate-50 px-3 py-3">
+        <div className="rounded-2xl bg-slate-50 px-3 py-3 text-center">
           <div className="text-xs text-slate-500">已配对</div>
-          <div className="mt-2 flex flex-wrap gap-2">
+          <div className="mt-2 flex flex-wrap justify-center gap-2">
             {userPairs.map((p) => (
               <button
                 key={`${p.grapheme}-${p.phoneme}`}

@@ -100,7 +100,7 @@ export function WordDetailPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="mx-auto max-w-3xl space-y-5">
       <div className="flex items-center justify-between">
         <Link to={backTo} className="text-sm font-medium text-brand-700">
           ← {backLabel}
@@ -141,11 +141,11 @@ export function WordDetailPage() {
             type="button"
             disabled={retrying}
             onClick={() => void handleRetry()}
-            className="w-full rounded-xl bg-amber-700 py-2.5 font-semibold text-white disabled:opacity-60"
+            className="w-full rounded-xl bg-amber-700 py-2.5 font-semibold text-white disabled:opacity-60 md:max-w-xs"
           >
             {retrying ? '正在重新查询…' : '重新生成音标'}
           </button>
-          {retryMsg ? <p className="text-center text-xs text-amber-800">{retryMsg}</p> : null}
+          {retryMsg ? <p className="text-center text-xs text-amber-800 md:text-left">{retryMsg}</p> : null}
         </div>
       ) : null}
 
@@ -153,7 +153,7 @@ export function WordDetailPage() {
         type="button"
         disabled={deleting}
         onClick={() => setShowDeleteModal(true)}
-        className="w-full rounded-2xl border border-red-200 py-3 text-sm font-medium text-red-600 active:bg-red-50 disabled:opacity-50"
+        className="w-full rounded-2xl border border-red-200 py-3 text-sm font-medium text-red-600 transition hover:bg-red-50 active:bg-red-50 disabled:opacity-50 md:max-w-xs"
       >
         删除此单词
       </button>

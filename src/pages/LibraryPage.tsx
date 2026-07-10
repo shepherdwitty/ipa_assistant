@@ -262,7 +262,7 @@ export function LibraryPage() {
               return (
                 <div key={group} className="mb-3">
                   <h4 className="mb-1.5 text-xs font-medium text-slate-500">{group}</h4>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
                     {items.map((p) => (
                       <PhonemeCard
                         key={p.phoneme}
@@ -311,7 +311,7 @@ export function LibraryPage() {
           ) : null}
 
           {activePhoneme ? (
-            <div className="rounded-3xl border border-brand-100 bg-brand-50/50 p-4">
+            <div className="sticky bottom-4 rounded-3xl border border-brand-100 bg-brand-50/95 p-4 shadow-sm backdrop-blur md:static md:shadow-none">
               <h3 className="font-semibold text-brand-900">
                 包含 {formatPhoneme(activePhoneme)} 的单词
               </h3>
