@@ -148,9 +148,23 @@ export const CHINA_48_PHONEMES: readonly string[] = [
   'w',
 ] as const
 
+/**
+ * 音素 mp3 URL。必须是「站点根」路径，不能依赖 BASE_URL=./ 的相对路径：
+ * 否则在 /word/:id 等嵌套路由下会错误解析成 /word/phonemes/xxx.mp3。
+ */
 export function getPhonemeAudioUrl(file: string): string {
-  // Vite public 目录
-  return `${import.meta.env.BASE_URL}phonemes/${file}`
+  const base = import.meta.env.BASE_URL || '/'
+  // './' 或 '.' 仅适合入口资源；public 音素一律按宿主根路径取
+  if (base === './' || base === '.' || base === '') {
+    return `/phonemes/${file}`
+  }
+  const prefix = base.endsWith('/') ? base : `${base}/`
+  // 已是绝对 http(s) 时直接拼；否则保证以 / 开头的根相对路径
+  if (/^https?:\/\//i.test(prefix)) {
+    return `${prefix}phonemes/${file}`
+  }
+  const root = prefix.startsWith('/') ? prefix : `/${prefix}`
+  return `${root}phonemes/${file}`.replace(/\/{2,}/g, '/')
 }
 
 /** 校验：48 音标是否都有音频映射 */

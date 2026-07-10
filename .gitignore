@@ -41,3 +41,4 @@ public/phonemes/_backup*
 
 # 作者原始下载（已映射进 public/phonemes/）
 origin_autdio/
+release

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   assertChina48Coverage,
   CHINA_48_PHONEMES,
+  getPhonemeAudioUrl,
   PHONEME_AUDIO_FILE,
 } from './phoneme-audio-map'
 
@@ -23,5 +24,13 @@ describe('China-48 phoneme audio map', () => {
     expect(PHONEME_AUDIO_FILE['dʒ'].toLowerCase()).not.toBe(
       PHONEME_AUDIO_FILE['dz'].toLowerCase(),
     )
+  })
+
+  it('resolves phoneme audio as root-absolute path (nested SPA routes safe)', () => {
+    const url = getPhonemeAudioUrl('n.mp3')
+    // 不能是 ./phonemes/...，否则 /word/:id 下会变成 /word/phonemes/...
+    expect(url.startsWith('./')).toBe(false)
+    expect(url).toMatch(/(^|\/)phonemes\/n\.mp3$/)
+    expect(url.includes('/word/')).toBe(false)
   })
 })

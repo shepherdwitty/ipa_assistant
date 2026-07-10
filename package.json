@@ -2,12 +2,19 @@
   "name": "ipa-kids",
   "private": true,
   "version": "0.1.0",
+  "description": "儿童国际音标识读辅助工具",
+  "author": "IPA Kids",
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "concurrently -k -n tts,web -c magenta,cyan \"npm run tts\" \"vite\"",
     "dev:web": "vite",
+    "dev:electron": "concurrently -k -n web,app -c cyan,green \"vite\" \"wait-on http://127.0.0.1:17321 && electron .\"",
     "tts": "node scripts/edge-tts-server.mjs",
     "build": "tsc -b && vite build",
+    "build:mac": "npm run build && electron-builder --mac --arm64 --x64",
+    "build:mac:arm64": "npm run build && electron-builder --mac --arm64",
+    "build:mac:x64": "npm run build && electron-builder --mac --x64",
     "lint": "oxlint",
     "preview": "concurrently -k -n tts,web -c magenta,cyan \"npm run tts\" \"vite preview\"",
     "test": "vitest run",
@@ -29,11 +36,49 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
     "concurrently": "^10.0.3",
+    "electron": "^43.1.0",
+    "electron-builder": "^26.15.3",
     "oxlint": "^1.71.0",
     "playwright": "^1.61.1",
     "tailwindcss": "^4.3.2",
     "typescript": "~6.0.2",
     "vite": "^8.1.1",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "wait-on": "^9.0.10"
+  },
+  "build": {
+    "appId": "app.ipa.kids",
+    "productName": "音标小助手",
+    "copyright": "Copyright © IPA Kids",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "scripts/edge-tts-server.mjs",
+      "package.json"
+    ],
+    "asar": true,
+    "mac": {
+      "category": "public.app-category.education",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["arm64", "x64"]
+        },
+        {
+          "target": "zip",
+          "arch": ["arm64", "x64"]
+        }
+      ],
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "identity": null
+    },
+    "dmg": {
+      "artifactName": "${productName}-${version}-mac-${arch}.${ext}"
+    },
+    "artifactName": "${productName}-${version}-mac-${arch}.${ext}"
   }
 }

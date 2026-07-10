@@ -153,7 +153,7 @@ export function WordDetailPage() {
         type="button"
         disabled={deleting}
         onClick={() => setShowDeleteModal(true)}
-        className="w-full rounded-2xl border border-red-200 py-3 text-sm font-medium text-red-600 transition hover:bg-red-50 active:bg-red-50 disabled:opacity-50 md:max-w-xs"
+        className="mx-auto block w-full max-w-xs rounded-2xl border border-red-200 py-3 text-sm font-medium text-red-600 transition hover:bg-red-50 active:bg-red-50 disabled:opacity-50"
       >
         删除此单词
       </button>
