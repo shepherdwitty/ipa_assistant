@@ -10,4 +10,11 @@ describe('splitPhonemes', () => {
     expect(splitPhonemes('/tʃeə/')).toEqual(['tʃ', 'eə'])
     expect(splitPhonemes('/ɡriːn/')).toEqual(['ɡ', 'r', 'iː', 'n'])
   })
+
+  it('handles China-48 extensions ts/dz/tr/dr', () => {
+    expect(splitPhonemes('/kæts/')).toEqual(['k', 'æ', 'ts'])
+    expect(splitPhonemes('/bedz/')).toEqual(['b', 'e', 'dz'])
+    expect(splitPhonemes('/triː/')).toEqual(['tr', 'iː'])
+    expect(splitPhonemes('/drɪŋk/')).toEqual(['dr', 'ɪ', 'ŋ', 'k'])
+  })
 })

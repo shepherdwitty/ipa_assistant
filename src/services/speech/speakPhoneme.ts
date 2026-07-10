@@ -223,7 +223,7 @@ export function canSpeak(): boolean {
 
 export function warmupSpeech(): void {
   if (typeof window === 'undefined') return
-  const warm = ['f', 'ʃ', 'ʊ', 'iː', 'ə', 'tʃ', 'p', 's']
+  const warm = ['f', 'ʃ', 'ʊ', 'iː', 'ə', 'tʃ', 'p', 's', 'tr', 'eɪ', 'θ']
   for (const p of warm) {
     const file = PHONEME_AUDIO_FILE[p]
     if (!file) continue

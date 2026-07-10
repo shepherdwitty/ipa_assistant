@@ -11,10 +11,14 @@ export function stripIpaSlashes(ipa: string): string {
     .replace(/\s+/g, '')
 }
 
-/** 常见多字符 IPA 单元（长者优先） */
+/** 常见多字符 IPA 单元（长者优先；含中国教材 48 音标扩展） */
 const MULTI_PHONEMES = [
   'tʃ',
   'dʒ',
+  'ts',
+  'dz',
+  'tr',
+  'dr',
   'aɪ',
   'aʊ',
   'eɪ',

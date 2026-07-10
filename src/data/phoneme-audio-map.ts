@@ -1,16 +1,49 @@
 /**
- * 英式教学音素 → 本地录音文件（public/phonemes/）
+ * 中国英语教学 48 个国际音标 → 本地录音（public/phonemes/）
  *
- * 音频来源：Wikimedia Commons IPA 示例录音
- * 许可：Creative Commons Attribution-ShareAlike 3.0 (CC BY-SA 3.0)
- * 整理参考：joshstephenson/PhoneticFlashCards 等对 Commons 的汇集
- *
- * 注：录音为国际音素示例，非商业教材级 RP；但远优于 TTS 硬念 IPA。
+ * 音源：Amy英语徐老师 教学录音（yb/ 下 48 个 M4A 映射转码）
+ * 说明：public/phonemes/ATTRIBUTION.md
+ * 覆盖：12 单元音 + 8 双元音 + 28 辅音（含教材 ts/dz/tr/dr）
+ * 双元音 / 破擦音均为整段文件，不拆串播。
  */
 
 /** 单音素 → 文件名（ASCII，位于 /phonemes/） */
 export const PHONEME_AUDIO_FILE: Record<string, string> = {
-  // 辅音
+  // ---------- 12 单元音 ----------
+  iː: 'i.mp3',
+  i: 'i.mp3',
+  ɪ: 'small_cap_i.mp3',
+  e: 'e.mp3',
+  ɛ: 'e.mp3',
+  eː: 'e.mp3',
+  æ: 'ae.mp3',
+  ɑː: 'aa.mp3',
+  ɑ: 'aa.mp3',
+  a: 'aa.mp3',
+  ɒ: 'oopen.mp3',
+  ɔː: 'openo.mp3',
+  ɔ: 'openo.mp3',
+  ʊ: 'upsilon.mp3',
+  uː: 'u.mp3',
+  u: 'u.mp3',
+  ʌ: 'strut.mp3',
+  ɜː: 'rev_epsilon.mp3',
+  ɜ: 'rev_epsilon.mp3',
+  ə: 'schwa.mp3',
+
+  // ---------- 8 双元音（整段连续，不拆播）----------
+  eɪ: 'ei.mp3',
+  aɪ: 'ai.mp3',
+  ɔɪ: 'oi.mp3',
+  əʊ: 'ou.mp3',
+  oʊ: 'ou.mp3',
+  o: 'ou.mp3',
+  aʊ: 'au.mp3',
+  ɪə: 'ia.mp3',
+  eə: 'ea.mp3',
+  ʊə: 'ua.mp3',
+
+  // ---------- 28 辅音（中国教材 48 音标）----------
   p: 'p.mp3',
   b: 'b.mp3',
   t: 't.mp3',
@@ -27,8 +60,14 @@ export const PHONEME_AUDIO_FILE: Record<string, string> = {
   ʃ: 'sh.mp3',
   ʒ: 'zh.mp3',
   h: 'h.mp3',
-  tʃ: 'tS.mp3',
-  dʒ: 'dZ.mp3',
+  // 文件名避免仅大小写不同（macOS 默认不区分大小写）
+  tʃ: 'ch.mp3',
+  dʒ: 'jh.mp3',
+  // 教材扩展：破擦/辅音连缀
+  ts: 'ts.mp3',
+  dz: 'dz.mp3',
+  tr: 'tr.mp3',
+  dr: 'dr.mp3',
   m: 'm.mp3',
   n: 'n.mp3',
   ŋ: 'ng.mp3',
@@ -37,38 +76,6 @@ export const PHONEME_AUDIO_FILE: Record<string, string> = {
   ɹ: 'r.mp3',
   j: 'j.mp3',
   w: 'w.mp3',
-  // 单元音（长音共用短音录音）
-  iː: 'i.mp3',
-  i: 'i.mp3',
-  ɪ: 'small_cap_i.mp3',
-  e: 'e.mp3',
-  ɛ: 'open_e.mp3',
-  æ: 'ae.mp3',
-  ɑː: 'aa.mp3',
-  ɑ: 'aa.mp3',
-  ɒ: 'oopen.mp3',
-  ɔː: 'openo.mp3',
-  ɔ: 'openo.mp3',
-  ʊ: 'upsilon.mp3',
-  uː: 'u.mp3',
-  u: 'u.mp3',
-  ʌ: 'strut.mp3',
-  ɜː: 'rev_epsilon.mp3',
-  ɜ: 'rev_epsilon.mp3',
-  ə: 'schwa.mp3',
-  eː: 'e.mp3',
-  o: 'o.mp3',
-  a: 'a.mp3',
-  // 双元音：整段连续录音（一次播放，不拆成两个单音）
-  eɪ: 'ei.mp3',
-  aɪ: 'ai.mp3',
-  ɔɪ: 'oi.mp3',
-  əʊ: 'ou.mp3',
-  oʊ: 'ou.mp3',
-  aʊ: 'au.mp3',
-  ɪə: 'ia.mp3',
-  eə: 'ea.mp3',
-  ʊə: 'ua.mp3',
 }
 
 /**
@@ -86,7 +93,67 @@ export const DIPHTHONG_SEQUENCE: Record<string, string[]> = {
   ʊə: ['ʊ', 'ə'],
 }
 
+/** 中国 48 音标标准列表（展示/校验用） */
+export const CHINA_48_PHONEMES: readonly string[] = [
+  // 单元音 12
+  'iː',
+  'ɪ',
+  'e',
+  'æ',
+  'ɑː',
+  'ɒ',
+  'ɔː',
+  'ʊ',
+  'uː',
+  'ʌ',
+  'ɜː',
+  'ə',
+  // 双元音 8
+  'eɪ',
+  'aɪ',
+  'ɔɪ',
+  'əʊ',
+  'aʊ',
+  'ɪə',
+  'eə',
+  'ʊə',
+  // 辅音 28
+  'p',
+  'b',
+  't',
+  'd',
+  'k',
+  'ɡ',
+  'f',
+  'v',
+  'θ',
+  'ð',
+  's',
+  'z',
+  'ʃ',
+  'ʒ',
+  'h',
+  'tʃ',
+  'dʒ',
+  'ts',
+  'dz',
+  'tr',
+  'dr',
+  'm',
+  'n',
+  'ŋ',
+  'l',
+  'r',
+  'j',
+  'w',
+] as const
+
 export function getPhonemeAudioUrl(file: string): string {
   // Vite public 目录
   return `${import.meta.env.BASE_URL}phonemes/${file}`
+}
+
+/** 校验：48 音标是否都有音频映射 */
+export function assertChina48Coverage(): string[] {
+  return CHINA_48_PHONEMES.filter((p) => !PHONEME_AUDIO_FILE[p])
 }

@@ -22,4 +22,13 @@ describe('alignGraphemePhoneme', () => {
     expect(units.find((u) => u.grapheme === 'w')?.phoneme).toBe('w')
     expect(units.find((u) => u.grapheme === 'a')?.phoneme).toBe('ɒ')
   })
+
+  it('maps China-48 tr/dr as single teaching units', () => {
+    const tree = alignGraphemePhoneme('tree', '/triː/')
+    expect(tree.some((u) => u.grapheme === 'tr' && u.phoneme === 'tr')).toBe(true)
+    expect(tree.some((u) => u.grapheme === 'ee' && u.phoneme === 'iː')).toBe(true)
+
+    const drink = alignGraphemePhoneme('drink', '/drɪŋk/')
+    expect(drink.some((u) => u.grapheme === 'dr' && u.phoneme === 'dr')).toBe(true)
+  })
 })

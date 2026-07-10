@@ -31,8 +31,13 @@ dist-ssr
 coverage
 .vite
 public/phonemes/_raw_backup
+public/phonemes/_backup_old_wikimedia
 public/phonemes/_cand
 public/phonemes/_smart
 public/phonemes/_v2
 public/phonemes/_tmp*
 public/phonemes/_raw_*
+public/phonemes/_backup*
+
+# 作者原始下载（已映射进 public/phonemes/）
+yb/

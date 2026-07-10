@@ -31,6 +31,11 @@ export const GRAPHEME_RULES: GraphemeRule[] = [
   { grapheme: 'sh', phonemes: ['ʃ'] },
   { grapheme: 'ch', phonemes: ['tʃ', 'k', 'ʃ'] },
   { grapheme: 'th', phonemes: ['θ', 'ð'] },
+  // 中国教材 48 音标：把 tr/dr/ts/dz 当独立教学单元（非纯英式 44 切分）
+  { grapheme: 'tr', phonemes: ['tr'] },
+  { grapheme: 'dr', phonemes: ['dr'] },
+  { grapheme: 'ts', phonemes: ['ts'] },
+  { grapheme: 'dz', phonemes: ['dz'] },
   { grapheme: 'ck', phonemes: ['k'] },
   { grapheme: 'ng', phonemes: ['ŋ'] },
   { grapheme: 'qu', phonemes: ['kw'] },

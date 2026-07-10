@@ -44,4 +44,4 @@ npm run build # 生产构建
 - **无账号**：数据保存在浏览器 IndexedDB，清除站点数据会丢失。
 - **音形对应**为教学向启发式映射，UI 使用「最相关字母组合」表述，不承诺语言学绝对精确。
 - OCR 为浏览器端 Tesseract，印刷体英文效果较好；复杂版式请配合手动补录。
-- **音标发音**：单音素使用 `public/phonemes/` 下的 Wikimedia Commons 录音（CC BY-SA 3.0，见该目录 `ATTRIBUTION.md`）；**整词**使用系统 TTS 读拼写。
+- **音标发音**：单音素使用 `public/phonemes/` 下 **Amy 教学 48 音标**录音（见 `ATTRIBUTION.md`）；**整词**使用系统 TTS 读拼写。

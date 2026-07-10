@@ -177,22 +177,43 @@ export function LibraryPage() {
       ) : (
         <div className="space-y-4">
           <div>
-            <h3 className="mb-2 text-sm font-semibold text-slate-700">常见音标</h3>
-            <div className="grid grid-cols-3 gap-2">
-              {COMMON_PHONEMES.map((p) => (
-                <PhonemeCard
-                  key={p.phoneme}
-                  phoneme={p.phoneme}
-                  label={p.label}
-                  tip={p.tip}
-                  active={activePhoneme === p.phoneme}
-                  count={phonemeCounts.has(p.phoneme) ? undefined : undefined}
-                  onClick={() =>
-                    setActivePhoneme((cur) => (cur === p.phoneme ? null : p.phoneme))
-                  }
-                />
-              ))}
-            </div>
+            <h3 className="mb-2 text-sm font-semibold text-slate-700">
+              48 个国际音标（英式教学）
+            </h3>
+            {(
+              [
+                '长元音',
+                '短元音',
+                '双元音',
+                '清辅音',
+                '浊辅音',
+              ] as const
+            ).map((group) => {
+              const items = COMMON_PHONEMES.filter((p) => p.group === group)
+              if (!items.length) return null
+              return (
+                <div key={group} className="mb-3">
+                  <h4 className="mb-1.5 text-xs font-medium text-slate-500">{group}</h4>
+                  <div className="grid grid-cols-3 gap-2">
+                    {items.map((p) => (
+                      <PhonemeCard
+                        key={p.phoneme}
+                        phoneme={p.phoneme}
+                        label={p.label}
+                        tip={p.tip}
+                        active={activePhoneme === p.phoneme}
+                        count={phonemeCounts.has(p.phoneme) ? undefined : undefined}
+                        onClick={() =>
+                          setActivePhoneme((cur) =>
+                            cur === p.phoneme ? null : p.phoneme,
+                          )
+                        }
+                      />
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
           </div>
 
           {usedPhonemes.length > 0 ? (

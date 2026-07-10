@@ -1,40 +1,28 @@
-# Phoneme audio attribution
+# Phoneme audio attribution（China-48 音库）
 
-Audio clips under this directory are derived from **Wikimedia Commons**
-recordings of International Phonetic Alphabet sounds (as used on Wikipedia
-IPA charts with audio).
+本目录为 **中国英语教学 48 个国际音标** 本地录音，供 App 单音素点击播放。
 
-## License
+## 当前音源
 
-**Creative Commons Attribution-ShareAlike 3.0 Unported (CC BY-SA 3.0)**
+| 项 | 说明 |
+|----|------|
+| **来源** | Amy英语徐老师 教学录音（作者本人） |
+| **整理** | 自 `yb/` 目录 48 个 `.M4A` 映射转码接入 |
+| **格式** | 单声道 44.1 kHz MP3（ffmpeg 去静音 + loudnorm） |
+| **覆盖** | 12 单元音 + 8 双元音 + 28 辅音（含 ts/dz/tr/dr） |
 
-https://creativecommons.org/licenses/by-sa/3.0/
+音质为真人教学发音，双元音 / 破擦音为整段录音（不串播两个音素）。
 
-You may share and adapt the material, including commercially, provided that:
+## 文件名约定
 
-1. **Attribution** is given to the original authors / Wikimedia Commons, and
-2. Derivative works are released under the **same license** (ShareAlike).
+ASCII 文件名，避免 macOS 大小写冲突：
 
-## Sources
+- `tʃ` → `ch.mp3`
+- `dʒ` → `jh.mp3`
+- `ts` / `dz` / `tr` / `dr` → 同名 `ts.mp3` 等
+- 长/短元音等见 `src/data/phoneme-audio-map.ts`
 
-- https://en.wikipedia.org/wiki/IPA_vowel_chart_with_audio
-- https://en.wikipedia.org/wiki/IPA_consonant_chart_with_audio
-- https://commons.wikimedia.org/ (individual `File:…ogg` pages)
-- Packaging reference: https://github.com/joshstephenson/PhoneticFlashCards
+## 历史
 
-Contributors of individual clips include (non-exhaustive): Peter Isotalo,
-User:Denelson83, UCLA Phonetics Lab Archive, User:Halibutt, User:Pmx, User:Octane,
-and others as listed on each Commons file page.
-
-## Note for this app
-
-Clips are **general IPA phone samples**, not commercial British RP courseware.
-They are used for single-phoneme playback in IPA Kids. Whole English **words**
-are spoken via the browser’s system TTS (not these files).
-
-### Diphthongs (`ei.mp3`, `ai.mp3`, …)
-
-English diphthongs are stored as **one continuous clip each** (not two monophthongs
-played in sequence). These were generated offline with macOS `say` (British voice)
-using pure diphthong keywords (ay / eye / oy / oh / ow / ear / air / oor), then
-encoded to MP3 for in-app playback.
+- 曾使用 Wikimedia Commons 混杂 IPA 样本、Edge TTS 合成等方案，已替换。
+- 旧文件备份可能位于 `_backup_*` 目录（本地，可不纳入版本库）。
