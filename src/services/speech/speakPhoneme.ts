@@ -4,6 +4,7 @@ import {
   PHONEME_AUDIO_FILE,
 } from '../../data/phoneme-audio-map'
 import { stripIpaSlashes } from '../../domain/phonemeSplit'
+import { fetchEdgeTtsUrl } from './edgeTts'
 
 export type SpeakOptions = {
   /** 完整 IPA 场景传入单词时，用 TTS 读拼写（更自然） */
@@ -98,18 +99,36 @@ function pickEnglishVoice(): SpeechSynthesisVoice | null {
   )
 }
 
-/** 单词拼写 → 系统 TTS（仅用于「读单词」） */
+/** 单词拼写 → Edge TTS（mp3）优先，失败回退系统 Web Speech */
 export async function speakWord(word: string): Promise<void> {
   if (!word.trim()) return
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return
+  if (typeof window === 'undefined') return
 
-  playToken += 1
+  const myToken = ++playToken
   stopAudio()
   const text = word.trim()
-  window.speechSynthesis.getVoices()
 
+  // 1) Edge TTS 代理：返回真实 mp3，iPad Safari 可稳定播放
+  try {
+    const url = await fetchEdgeTtsUrl(text)
+    if (myToken !== playToken) return
+    await playUrl(url)
+    return
+  } catch (err) {
+    console.warn('[speakWord] edge-tts unavailable, fallback Web Speech', err)
+  }
+
+  // 2) 回退：系统 Web Speech（桌面尚可，iPad 往往较差）
+  if (!('speechSynthesis' in window)) return
+  if (myToken !== playToken) return
+
+  window.speechSynthesis.getVoices()
   await new Promise<void>((resolve) => {
     window.setTimeout(() => {
+      if (myToken !== playToken) {
+        resolve()
+        return
+      }
       try {
         window.speechSynthesis.resume()
       } catch {

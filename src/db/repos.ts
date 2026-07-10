@@ -360,6 +360,40 @@ export async function listRuleCards(): Promise<RuleCard[]> {
   return cards.sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
 }
 
+export async function getRuleCard(id: string): Promise<RuleCard | undefined> {
+  await rebuildRuleCardsFromLibrary()
+  return db.ruleCards.get(id)
+}
+
+/**
+ * 某条规律（字母组合 → 音标）关联的全部正常单词。
+ * 合并卡片例词 id 与 graphemeMaps 反查结果。
+ */
+export async function listWordsForRule(
+  grapheme: string,
+  phoneme: string,
+  exampleWordIds: string[] = [],
+): Promise<WordRecord[]> {
+  const maps = await db.graphemeMaps
+    .where('grapheme')
+    .equals(grapheme)
+    .filter((m) => m.phoneme === phoneme)
+    .toArray()
+
+  const idSet = new Set<string>([...exampleWordIds, ...maps.map((m) => m.wordId)])
+  if (idSet.size === 0) return []
+
+  const rows = await db.words.bulkGet([...idSet])
+  return rows
+    .filter((w): w is WordRecord => Boolean(w && w.status === 'normal' && w.ipaFull))
+    .sort((a, b) => {
+      // 短词优先，便于讲解
+      const len = a.word.length - b.word.length
+      if (len !== 0) return len
+      return a.word.localeCompare(b.word)
+    })
+}
+
 export async function bumpRuleStreak(grapheme: string, phoneme: string, correct: boolean) {
   const id = `rule_${grapheme}_${phoneme}`
   const card = await db.ruleCards.get(id)

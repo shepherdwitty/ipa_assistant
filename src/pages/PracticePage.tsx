@@ -18,9 +18,9 @@ import {
   type PracticeQuestion,
 } from '../domain/practiceGen'
 import { formatPhoneme } from '../domain/phonemeSplit'
-import { speakPhoneme } from '../services/speech/speakPhoneme'
+import { speakPhoneme, speakWord } from '../services/speech/speakPhoneme'
 
-type Mode = 'home' | 'phoneme-find' | 'pair-match' | 'cards'
+type Mode = 'home' | 'phoneme-find' | 'pair-match'
 
 export function PracticePage() {
   const [mode, setMode] = useState<Mode>('home')
@@ -34,7 +34,6 @@ export function PracticePage() {
   const [userPairs, setUserPairs] = useState<Array<{ grapheme: string; phoneme: string }>>([])
   const [feedback, setFeedback] = useState<'idle' | 'correct' | 'wrong'>('idle')
   const [score, setScore] = useState({ correct: 0, total: 0 })
-  const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
 
   useEffect(() => {
     void (async () => {
@@ -180,16 +179,15 @@ export function PracticePage() {
                 把字母组合和音标片段配对
               </div>
             </button>
-            <button
-              type="button"
-              onClick={() => setMode('cards')}
-              className="w-full rounded-3xl border border-amber-200 bg-amber-50 px-4 py-5 text-left"
+            <Link
+              to="/practice/cards"
+              className="block w-full rounded-3xl border border-amber-200 bg-amber-50 px-4 py-5 text-left"
             >
               <div className="text-base font-bold text-amber-900">规律卡片</div>
               <div className="mt-1 text-sm text-amber-800">
                 已点亮 {cards.filter((c) => c.unlocked).length} 张
               </div>
-            </button>
+            </Link>
           </div>
         )}
 
@@ -198,145 +196,6 @@ export function PracticePage() {
             本次正确 {score.correct}/{score.total}
           </p>
         ) : null}
-      </div>
-    )
-  }
-
-  if (mode === 'cards') {
-    const selectedCard = cards.find((c) => c.id === selectedCardId) ?? null
-    // 优先用卡片记录的例词；若为空则从当前词库映射反查
-    const relatedWords: WordRecord[] = (() => {
-      if (!selectedCard) return []
-      const byId = new Map(words.map((w) => [w.id, w]))
-      const fromCard = selectedCard.exampleWordIds
-        .map((id) => byId.get(id))
-        .filter((w): w is WordRecord => Boolean(w))
-
-      const fromMaps: WordRecord[] = []
-      for (const w of words) {
-        const maps = mapsByWord.get(w.id) ?? []
-        if (
-          maps.some(
-            (m) =>
-              m.grapheme === selectedCard.grapheme && m.phoneme === selectedCard.phoneme,
-          )
-        ) {
-          fromMaps.push(w)
-        }
-      }
-
-      const merged = new Map<string, WordRecord>()
-      for (const w of [...fromCard, ...fromMaps]) merged.set(w.id, w)
-      return Array.from(merged.values()).sort((a, b) => a.word.localeCompare(b.word))
-    })()
-
-    return (
-      <div className="space-y-4">
-        <button
-          type="button"
-          onClick={() => {
-            setSelectedCardId(null)
-            setMode('home')
-          }}
-          className="text-sm font-medium text-brand-700"
-        >
-          ← 返回
-        </button>
-        <div>
-          <h2 className="text-lg font-bold">规律卡片</h2>
-          <p className="mt-1 text-sm text-slate-500">点击卡片查看关联单词，再进入拆解页讲解</p>
-        </div>
-        {cards.length === 0 ? (
-          <p className="text-sm text-slate-500">导入更多单词后会自动点亮规律卡片</p>
-        ) : (
-          <>
-            <div className="grid grid-cols-2 gap-3">
-              {cards.map((c) => {
-                const active = selectedCardId === c.id
-                return (
-                  <div
-                    key={c.id}
-                    className={[
-                      'rounded-2xl border px-3 py-4 text-center transition',
-                      active
-                        ? 'border-amber-500 bg-amber-100 shadow-md ring-2 ring-amber-200'
-                        : 'border-amber-200 bg-gradient-to-br from-amber-50 to-white',
-                    ].join(' ')}
-                  >
-                    <button
-                      type="button"
-                      className="w-full active:scale-[0.98]"
-                      onClick={() => {
-                        void speakPhoneme(c.phoneme)
-                        setSelectedCardId((id) => (id === c.id ? null : c.id))
-                      }}
-                    >
-                      <div className="text-xl font-bold text-slate-900">{c.grapheme}</div>
-                      <div className="my-1 text-slate-300">→</div>
-                      <div className="text-lg font-semibold text-brand-700">
-                        {formatPhoneme(c.phoneme)}
-                      </div>
-                      <div className="mt-2 text-xs text-slate-500">
-                        例词 {c.exampleWordIds.length || '·'} · 连对 {c.streakCorrect}
-                      </div>
-                      <div className="mt-1 text-[10px] font-medium text-amber-700/80">
-                        {active ? '收起例词' : '点击听音 · 查看例词'}
-                      </div>
-                    </button>
-                  </div>
-                )
-              })}
-            </div>
-
-            {selectedCard ? (
-              <section className="rounded-3xl border border-amber-200 bg-white p-4 shadow-sm">
-                <h3 className="text-sm font-semibold text-slate-800">
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1"
-                    onClick={() => void speakPhoneme(selectedCard.phoneme)}
-                  >
-                    <span className="text-brand-700">{selectedCard.grapheme}</span>
-                    <span className="text-slate-400">→</span>
-                    <span className="text-brand-700">{formatPhoneme(selectedCard.phoneme)}</span>
-                  </button>
-                  <span className="ml-2 font-normal text-slate-500">
-                    关联 {relatedWords.length} 个词
-                  </span>
-                </h3>
-                <p className="mt-1 text-xs text-slate-500">
-                  在这些单词里，该字母组合与音标最相关（教学向展示，非绝对规律）。
-                </p>
-                {relatedWords.length === 0 ? (
-                  <p className="mt-4 text-sm text-slate-500">
-                    暂无关联单词（可能词条已删除）。可重新导入含该规律的词。
-                  </p>
-                ) : (
-                  <ul className="mt-3 space-y-2">
-                    {relatedWords.map((w) => (
-                      <li key={w.id}>
-                        <Link
-                          to={`/word/${w.id}?p=${encodeURIComponent(selectedCard.phoneme)}`}
-                          className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 active:bg-brand-50"
-                        >
-                          <div>
-                            <div className="font-semibold tracking-wide text-slate-900">
-                              {w.word}
-                            </div>
-                            <div className="text-xs text-slate-500">{w.ipaFull}</div>
-                          </div>
-                          <span className="text-sm text-brand-700">拆解 →</span>
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </section>
-            ) : (
-              <p className="text-center text-sm text-slate-400">点选上方卡片查看例词</p>
-            )}
-          </>
-        )}
       </div>
     )
   }
@@ -400,6 +259,24 @@ function PhonemeFindView({
   onNext: () => void
   onHome: () => void
 }) {
+  // 揭晓后自动依次朗读正确答案单词；点卡片可重播
+  useEffect(() => {
+    if (feedback === 'idle') return
+    let cancelled = false
+    const correctWords = q.options.filter((w) => q.correctIds.includes(w.id))
+    void (async () => {
+      for (const w of correctWords) {
+        if (cancelled) return
+        await speakWord(w.word)
+        if (cancelled) return
+        await new Promise((r) => setTimeout(r, 280))
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [feedback, q])
+
   return (
     <div className="space-y-5">
       <button type="button" onClick={onHome} className="text-sm font-medium text-brand-700">
@@ -425,14 +302,35 @@ function PhonemeFindView({
           if (feedback === 'idle' && on) cls = 'border-brand-500 bg-brand-50'
           if (feedback !== 'idle' && isCorrect) cls = 'border-green-500 bg-green-50'
           if (feedback === 'wrong' && on && !isCorrect) cls = 'border-red-400 bg-red-50'
+          const revealed = feedback !== 'idle'
           return (
             <button
               key={w.id}
               type="button"
-              onClick={() => onToggle(w.id)}
-              className={`rounded-2xl border-2 px-3 py-4 text-center font-semibold ${cls}`}
+              onClick={() => {
+                if (revealed) {
+                  void speakWord(w.word)
+                  return
+                }
+                // 选中时播放；取消选中不播放
+                if (!on) void speakWord(w.word)
+                onToggle(w.id)
+              }}
+              className={`rounded-2xl border-2 px-3 py-4 text-center font-semibold transition active:scale-[0.98] ${cls}`}
+              aria-label={
+                revealed
+                  ? `朗读单词 ${w.word}`
+                  : on
+                    ? `取消选择 ${w.word}`
+                    : `选择并朗读 ${w.word}`
+              }
             >
               {w.word}
+              {revealed ? (
+                <span className="mt-1 block text-[10px] font-medium text-slate-400">
+                  点按重播
+                </span>
+              ) : null}
             </button>
           )
         })}
@@ -493,20 +391,42 @@ function PairMatchView({
   onNext: () => void
   onHome: () => void
 }) {
+  // 揭晓结果后自动读单词；点卡片可重播
+  useEffect(() => {
+    if (feedback === 'idle') return
+    void speakWord(q.word.word)
+  }, [feedback, q.word.id, q.word.word])
+
   return (
     <div className="space-y-5">
       <button type="button" onClick={onHome} className="text-sm font-medium text-brand-700">
         ← 返回
       </button>
-      <div className="rounded-3xl bg-slate-900 px-5 py-6 text-center text-white">
+      <button
+        type="button"
+        disabled={feedback === 'idle'}
+        onClick={() => {
+          if (feedback !== 'idle') void speakWord(q.word.word)
+        }}
+        className={[
+          'w-full rounded-3xl bg-slate-900 px-5 py-6 text-center text-white transition',
+          feedback !== 'idle' ? 'active:scale-[0.99] active:opacity-95' : '',
+        ].join(' ')}
+        aria-label={
+          feedback === 'idle' ? q.word.word : `朗读单词 ${q.word.word}，可再次点击重播`
+        }
+      >
         <div className="text-sm text-slate-300">把字母组合与音标配对</div>
         <div className="mt-2 text-3xl font-bold tracking-widest">{q.word.word}</div>
         {feedback === 'idle' ? (
           <div className="mt-2 text-sm text-slate-400">完整音标将在提交后揭晓</div>
         ) : (
-          <div className="mt-1 text-xl text-brand-200">{q.word.ipaFull}</div>
+          <>
+            <div className="mt-1 text-xl text-brand-200">{q.word.ipaFull}</div>
+            <div className="mt-2 text-xs text-slate-400">点卡片可再听一遍</div>
+          </>
         )}
-      </div>
+      </button>
 
       <div>
         <h3 className="mb-2 text-sm font-semibold text-slate-600">字母组合</h3>

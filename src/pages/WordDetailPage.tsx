@@ -1,15 +1,25 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { AlignmentView } from '../components/AlignmentView'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { deleteWord, getGraphemeMaps, getWord, refreshWordIpa } from '../db/repos'
 import type { GraphemePhonemeMap, WordRecord } from '../db/schema'
 
+/** 从规律卡片 / 词库等入口带入，用于正确返回上一页 */
+export type WordDetailLocationState = {
+  backTo?: string
+  backLabel?: string
+}
+
 export function WordDetailPage() {
   const { wordId } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const [search] = useSearchParams()
   const focusPhoneme = search.get('p')
+  const navState = (location.state as WordDetailLocationState | null) ?? null
+  const backTo = navState?.backTo || '/library'
+  const backLabel = navState?.backLabel || '返回词库'
   const [word, setWord] = useState<WordRecord | null>(null)
   const [maps, setMaps] = useState<GraphemePhonemeMap[]>([])
   const [error, setError] = useState('')
@@ -59,7 +69,7 @@ export function WordDetailPage() {
     setDeleting(true)
     try {
       await deleteWord(wordId)
-      navigate('/library', { replace: true })
+      navigate(backTo, { replace: true })
     } catch (e) {
       setRetryMsg(e instanceof Error ? e.message : '删除失败')
       setDeleting(false)
@@ -71,8 +81,8 @@ export function WordDetailPage() {
     return (
       <div className="space-y-3 py-8 text-center">
         <p className="text-red-600">{error}</p>
-        <Link to="/library" className="text-brand-700 underline">
-          返回词库
+        <Link to={backTo} className="text-brand-700 underline">
+          {backLabel}
         </Link>
       </div>
     )
@@ -85,8 +95,8 @@ export function WordDetailPage() {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <Link to="/library" className="text-sm font-medium text-brand-700">
-          ← 返回词库
+        <Link to={backTo} className="text-sm font-medium text-brand-700">
+          ← {backLabel}
         </Link>
         <span
           className={[

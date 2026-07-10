@@ -40,4 +40,4 @@ public/phonemes/_raw_*
 public/phonemes/_backup*
 
 # 作者原始下载（已映射进 public/phonemes/）
-yb/
+origin_autdio/

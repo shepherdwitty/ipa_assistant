@@ -44,4 +44,5 @@ npm run build # 生产构建
 - **无账号**：数据保存在浏览器 IndexedDB，清除站点数据会丢失。
 - **音形对应**为教学向启发式映射，UI 使用「最相关字母组合」表述，不承诺语言学绝对精确。
 - OCR 为浏览器端 Tesseract，印刷体英文效果较好；复杂版式请配合手动补录。
-- **音标发音**：单音素使用 `public/phonemes/` 下 **Amy 教学 48 音标**录音（见 `ATTRIBUTION.md`）；**整词**使用系统 TTS 读拼写。
+- **音标发音**：单音素使用 `public/phonemes/` 下 **Amy 教学 48 音标**录音（见 `ATTRIBUTION.md`）；**整词**优先走本地 Edge TTS 代理（`node-edge-tts` → mp3，iPad 可播），失败再回退系统 Web Speech。
+- **开发启动**：`npm run dev` 会同时起 Vite + Edge TTS 服务（`:8787`）。仅前端可用 `npm run dev:web`。iPad 请用电脑局域网地址访问（Vite 已 `host: true`）。
